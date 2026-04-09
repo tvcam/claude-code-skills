@@ -25,6 +25,8 @@ allowed-tools:
 
 # Figma to DESIGN.md Skill (v2 — Precision Edition)
 
+> *Inspired by [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) — bridging the gap between static DESIGN.md files and live Figma MCP extraction.*
+
 ## Preamble (run first)
 
 When this skill is loaded, **immediately** output:
