@@ -1,10 +1,10 @@
 ---
 name: figma-design-md
-version: 2.0.0
+version: 2.1.0
 description: |
-  Generate a precision DESIGN.md + save raw Figma source for 1:1 front-end implementation.
-  Pulls design context via Figma MCP, cross-references with the actual codebase, and outputs
-  a pixel-accurate design document with Tailwind-native values.
+  Generate a precision DESIGN.md from Figma as the single source of truth for front-end implementation.
+  Pulls design context via Figma MCP, translates design values into Tailwind-native syntax,
+  and optionally cross-references with the existing codebase for class mapping.
   - MANDATORY TRIGGERS: figma-design-md, design-md, design md
   - AUTO-DETECT: When the user pastes a Figma URL (figma.com/design/*, figma.com/board/*, figma.com/make/*) and asks to implement, build, or code a section — this skill MUST activate automatically BEFORE any implementation begins. The DESIGN.md is generated first, then used as the reference for coding.
   - Also trigger when: user says "generate design md", "create design md from figma", "extract design system from figma"
@@ -23,7 +23,7 @@ allowed-tools:
   - mcp__claude_ai_Figma__get_metadata
 ---
 
-# Figma to DESIGN.md Skill (v2 — Precision Edition)
+# Figma to DESIGN.md Skill (v2.1 — Figma-First Edition)
 
 > *Inspired by [awesome-design-md](https://github.com/VoltAgent/awesome-design-md) — bridging the gap between static DESIGN.md files and live Figma MCP extraction.*
 
@@ -103,11 +103,11 @@ asset_expiry: {7 days from now}
 | {name} | {url} | {date} |
 ```
 
-This raw source is the **ground truth** for implementation. The DESIGN.md is an interpreted layer on top.
+This raw source is the **ground truth**. The DESIGN.md is a Tailwind-translated interpretation of this Figma source.
 
-### Step 3 — Deep codebase audit (CRITICAL for accuracy)
+### Step 3 — Codebase context scan (optional, for Tailwind class mapping)
 
-This step is what makes the difference between 80% and 99% accuracy. Run these searches **in parallel**:
+If an existing codebase is present, scan it to find the closest Tailwind class equivalents for Figma values. This helps translate Figma pixel values into the project's Tailwind vocabulary — but **Figma values always win when there's a conflict**. Run these searches **in parallel**:
 
 #### 3a. Color audit
 Search ALL project files for every hex color, rgba value, and opacity modifier actually in use:
@@ -141,22 +141,22 @@ Search for all `rounded-*` classes and their frequency to identify the actual ra
 - Check if `DESIGN.md` already exists — read it if so
 - Check if `figma-sources/` directory exists
 
-### Step 4 — Cross-reference Figma values with codebase
+### Step 4 — Translate Figma values to Tailwind
 
-This is the precision step. For every value extracted from the Figma reference code:
+The Figma design is the source of truth. Convert its values to Tailwind syntax:
 
-1. **Colors**: Does this hex exist in the codebase? If yes, note how it's used. If not, flag it as new.
-2. **Spacing**: Convert Figma absolute pixel values to the nearest Tailwind class the project actually uses. Example:
-   - Figma says `left-[25px]` → codebase uses `px-6` (24px) → document as `px-6` (24px), NOT 25px
-   - Figma says `h-[40px]` → codebase uses `h-10` → document as `h-10` (40px)
-   - Figma says `h-[44px]` → codebase uses `h-11` → document as `h-11` (44px)
-3. **Radius**: Map Figma `rounded-[Npx]` to the Tailwind class actually used. Example:
-   - Figma says `rounded-[28px]` → codebase uses `rounded-full` → document as `rounded-full`
-   - Figma says `rounded-[5px]` → check if codebase uses `rounded-[5px]` or `rounded-sm` or `rounded`
-4. **Typography**: Verify font weights/sizes against what's actually loaded in Google Fonts imports.
-5. **Shadows**: Check if the Figma shadow matches codebase shadows exactly.
+1. **Colors**: Use the exact hex values from Figma. Note if they also exist in the codebase for context.
+2. **Spacing**: Convert Figma pixel values to the nearest standard Tailwind class. Example:
+   - Figma says `25px` → use `p-[25px]` (arbitrary) or `px-6` (24px) if the 1px difference is acceptable
+   - Figma says `40px` → use `h-10` (40px)
+   - Figma says `44px` → use `h-11` (44px)
+3. **Radius**: Map Figma radius to standard Tailwind classes where they match. Example:
+   - Figma says `28px` radius on a pill → `rounded-full`
+   - Figma says `5px` radius → `rounded` (4px) or `rounded-[5px]` — prefer exact Figma value
+4. **Typography**: Document the font families, weights, and sizes exactly as specified in the Figma design.
+5. **Shadows**: Use the exact shadow values from the Figma design.
 
-**ALWAYS prefer the codebase's Tailwind class over raw pixel values.** The DESIGN.md must speak the project's language.
+**ALWAYS prefer Figma's design values over what the codebase currently uses.** The DESIGN.md represents the intended design, not the current implementation state.
 
 ### Step 5 — Generate the DESIGN.md
 
@@ -164,7 +164,7 @@ Generate a DESIGN.md with these requirements:
 
 #### PRECISION RULES (non-negotiable):
 
-1. **Every color must include its opacity variants.** If `#121f46` is used, also document `#121f46/5`, `/10`, `/20`, `/30`, `/70` etc. that appear in the codebase. Format as a sub-list:
+1. **Every color must include its opacity variants.** If `#121f46` is used in the Figma design, also document opacity variants specified in the design. If a codebase exists, note additional opacity variants found there. Format as a sub-list:
    ```
    - **Navy Text** (`#121f46`): Primary heading color
      - `/5` — subtle background tint
@@ -176,15 +176,15 @@ Generate a DESIGN.md with these requirements:
 
 2. **Every spacing value must be in Tailwind classes, not pixels.** Write `px-6` (24px) not "25px padding". The parenthetical pixel value is for reference only. If the project uses an arbitrary value like `p-[25px]`, write it as-is.
 
-3. **Every dimension must match the actual codebase.** If buttons are `h-10` in some places and `h-11` in others, document both with their contexts. Do not simplify to one value.
+3. **Every dimension must match the Figma design.** If the design specifies different sizes for different button variants, document each with its context.
 
-4. **Every border-radius must use the project's actual Tailwind class.** Write `rounded-full` not `rounded-[28px]`. Write `rounded-lg` not `rounded-[8px]` (unless the codebase literally uses the arbitrary form).
+4. **Every border-radius must use the standard Tailwind class where it maps cleanly.** Write `rounded-full` not `rounded-[28px]`. Write `rounded-lg` for `8px`. Use arbitrary values like `rounded-[5px]` when no standard class matches the Figma value.
 
-5. **Every shadow must be listed exactly as it appears in code.** Both custom (`shadow-[0px_4px_4px_0px_#f3d4c6]`) AND standard Tailwind (`shadow-md`) if both are used.
+5. **Every shadow must match the Figma design.** Convert Figma shadow values to Tailwind syntax — either standard classes (`shadow-md`) or arbitrary values (`shadow-[0px_4px_4px_0px_#f3d4c6]`).
 
-6. **Hover states must be documented.** If a color has a hover variant (e.g., `#c58600` for gold hover), include it.
+6. **Hover states must be documented.** If the Figma design specifies hover variants (e.g., `#c58600` for gold hover), include them.
 
-7. **Font weights must match Google Fonts imports.** If only weights 300 and 400 of Newsreader are loaded, don't document weight 500.
+7. **Font weights must match the Figma design.** Document all weights specified in the design — these are what should be loaded in the implementation.
 
 8. **Responsive patterns must use actual breakpoint prefixes.** Write `px-6 md:px-12 lg:px-20` not "24px on mobile, 48px on tablet, 80px on desktop".
 
@@ -339,8 +339,8 @@ Card shadow:      shadow-[0px_4px_4px_0px_#f3d4c6]
 
 ### Component Copy-Paste Snippets
 {For each major component, provide a complete HTML snippet with exact Tailwind classes
-that can be dropped directly into an ERB template. These must be tested against the
-codebase patterns — not generated from Figma pixel values.}
+that can be dropped directly into a template. These are generated from the Figma design
+values, translated to Tailwind syntax.}
 
 ## 10. Figma Source Reference
 
@@ -354,16 +354,16 @@ codebase patterns — not generated from Figma pixel values.}
 
 Before writing the DESIGN.md, run a self-audit checklist:
 
-- [ ] **Every hex color** in the DESIGN.md exists in either the Figma source OR the codebase (grep to verify)
-- [ ] **Every opacity variant** actually used in the codebase is documented
-- [ ] **Every spacing value** is expressed as a Tailwind class, not raw pixels (unless the project uses arbitrary values)
-- [ ] **Every border-radius** uses the project's actual class (`rounded-full`, `rounded-lg`, etc.)
-- [ ] **Every shadow** matches exactly what's in the codebase — no invented shadows
-- [ ] **Every font weight** is actually loaded in the Google Fonts import
-- [ ] **Every hover state** that exists in the codebase is documented
-- [ ] **Responsive padding** uses the actual breakpoint pattern from the project
-- [ ] **Button/input heights** list ALL variants used, not just one
-- [ ] **The component snippets** use classes that actually appear in the project
+- [ ] **Every hex color** in the DESIGN.md comes from the Figma source
+- [ ] **Every opacity variant** specified in the Figma design is documented
+- [ ] **Every spacing value** is expressed as a Tailwind class, not raw pixels (unless an arbitrary value is needed)
+- [ ] **Every border-radius** uses the correct Tailwind class mapping
+- [ ] **Every shadow** matches the Figma design values
+- [ ] **Every font weight** matches what the Figma design specifies
+- [ ] **Every hover state** from the Figma design is documented
+- [ ] **Responsive patterns** follow the Figma design's breakpoint specifications
+- [ ] **Button/input heights** list ALL variants from the design, not just one
+- [ ] **The component snippets** faithfully represent the Figma design in Tailwind
 
 If any check fails, fix it before writing.
 
@@ -391,17 +391,17 @@ Output:
 
 This skill targets **99% precision**. That means:
 
-1. **Zero invented values.** Every number in the DESIGN.md must come from either the Figma source code or a grep of the codebase. If a value can't be verified, flag it with `⚠️ unverified` rather than guessing.
+1. **Zero invented values.** Every number in the DESIGN.md must come from the Figma source. If a value can't be verified from the Figma design, flag it with `⚠️ unverified` rather than guessing.
 
 2. **Tailwind-native output.** The DESIGN.md speaks Tailwind, not CSS. `px-6` not `padding: 24px`. `rounded-full` not `border-radius: 28px`. `h-10` not `height: 40px`. Exception: arbitrary values like `shadow-[...]` which are already Tailwind syntax.
 
-3. **Figma values are hints, codebase values are truth.** When Figma says 25px and the codebase uses `px-6` (24px), document `px-6` (24px). The Figma is a design intent document; the codebase is the implementation reality. For NEW sections not yet implemented, use Figma values but flag them as `📐 from Figma — not yet in codebase`.
+3. **Figma is the source of truth, not the codebase.** The DESIGN.md represents the designer's intent. When Figma says 25px, document `p-[25px]` (or `px-6` if the 1px rounding is acceptable). The codebase may diverge from the design — that's a bug in the implementation, not in the DESIGN.md. If the codebase uses different values, note them as `🔧 current implementation differs` for reference.
 
-4. **Complete opacity coverage.** If `#121f46` appears at `/5`, `/10`, `/20`, `/30`, `/70` in the codebase, ALL five must be in the DESIGN.md. Missing opacity variants was the #1 accuracy gap in v1.
+4. **Complete opacity coverage.** If the Figma design uses `#121f46` at various opacities, ALL must be in the DESIGN.md. Additionally note any opacity variants found in the codebase for migration context.
 
-5. **All shadow types.** Document BOTH custom shadows (`shadow-[...]`) AND standard Tailwind shadows (`shadow-md`, `shadow-lg`) if both appear in the codebase. v1 missed `shadow-md` entirely.
+5. **All shadow types.** Document all shadows specified in the Figma design, converted to Tailwind syntax.
 
-6. **All interactive states.** Hover colors, focus rings, active states — if they exist in the codebase, they must be documented.
+6. **All interactive states.** Hover colors, focus rings, active states — if they're specified in the Figma design, they must be documented.
 
 ---
 
@@ -422,7 +422,7 @@ If invoked with an existing DESIGN.md and a new Figma URL:
 
 1. Read the existing DESIGN.md
 2. Pull the new design context and save raw source
-3. Re-run the codebase audit (Step 3) — values may have changed since last run
+3. Optionally re-run the codebase context scan (Step 3) for Tailwind class mapping
 4. Identify new colors, components, or patterns not already documented
 5. Add them to the appropriate sections
 6. Flag any conflicts (e.g., same role mapped to different colors) for user resolution
